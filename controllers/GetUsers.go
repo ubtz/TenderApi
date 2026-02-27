@@ -14,14 +14,14 @@ type Users struct {
 	Id       int    `json:"id"`
 	Username string `json:"username"`
 	// PasswordHash string `json:"password_hash"`
-	Ovog      string `json:"ovog"`
-	Ner       string `json:"ner"`
-	Email     string `json:"email"`
-	CreatedAt string `json:"created_at"`
-	Code      string `json:"code"`
-	Dep       string `json:"dep"`
-	Div       string `json:"division"`
-	Erh       string `json:"erh"`
+	Ovog      string  `json:"ovog"`
+	Ner       string  `json:"ner"`
+	Email     string  `json:"email"`
+	CreatedAt string  `json:"created_at"`
+	Code      string  `json:"code"`
+	Dep       string  `json:"dep"`
+	Div       *string `json:"division"`
+	Erh       string  `json:"erh"`
 }
 
 // GetUsers controller

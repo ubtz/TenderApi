@@ -35,6 +35,12 @@ func init() {
 		beego.NSRouter("/GetBasketItemsById/:basketId", &controllers.GetBasketItemsById{}, "get:GetBasketItemsById"),
 		beego.NSRouter("/GetUsers", &controllers.GetUsers{}, "get:GetAllUsers"),
 		beego.NSRouter("/Statistic", &controllers.GetStatistic{}, "get:GetStatistic"),
+		beego.NSRouter("/GetTenderChainById/:tenderId", &controllers.GetTenderChainById{}, "get:GetTenderChainById"),
+		beego.NSRouter("/GetItemSteps/:itemId", &controllers.GetItemSteps{}, "get:GetItemSteps"),
+		beego.NSRouter("/GetBasketIdsByRootNum/:rootNum", &controllers.GetBasketIdsByRootNum{}, "get:Get"),
+		beego.NSRouter("/GetTest", &controllers.GetTestController{}, "get:Get"),
+		// New route for GetTotalInfo
+		beego.NSRouter("/GetTotalInfo", &controllers.GetTotalInfo{}, "get:GetTotalInfo"),
 	)
 
 	beego.AddNamespace(nss)

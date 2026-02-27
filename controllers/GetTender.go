@@ -43,6 +43,7 @@ type Tender struct {
 	ЗҮКДугаар                string  `json:"зүк_дугаар"`
 	ЗҮКОгноо                 string  `json:"зүк_огноо"`
 	BasketIds                string  `json:"basket_ids"`
+	RootTenderId             *int    `json:"root_tender_id"`
 }
 
 type GetTender struct {
@@ -58,7 +59,7 @@ func (c *GetTender) GetTender() {
 
 	// 🧩 Build query depending on environment
 	query := `
-		SELECT TOP (1000)
+		SELECT TOP (100000)
 			t.TenderId, t.PlanRootNumber, t.TenderName, t.[Шалгаруулалтын_төрөл],
 			t.[Тендерийн_дугаар], t.[Тендерийн_төрөл], t.[Батлагдсан_төсөвт_өртөг],
 			t.[Урилгийн_дугаар], t.[Урилгийн_огноо], t.[Үнэлгээ_хийсэн_огноо],
@@ -70,15 +71,16 @@ func (c *GetTender) GetTender() {
 			ISNULL(u.Ner, '') AS CreatedByNer,
 			t.[Тендер_нээх_огноо], t.[Тендер_хаах_огноо],
 			t.[Тендерт_оролцогч], t.[Organization], t.[Ү_Дарга], t.[Ү_Гишүүд],
-			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids]
+			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids], t.[RootTenderId]
 		FROM [Tender].[dbo].[Tender] AS t
 		LEFT JOIN [Tender].[dbo].[Users] AS u ON t.CreatedBy = u.Id
+		WHERE t.RootTenderId IS NULL
 		ORDER BY t.TenderId DESC
 	`
 
 	if config.Env == "prod" {
 		query = `
-		SELECT TOP (1000)
+		SELECT TOP (100000)
 			t.TenderId, t.PlanRootNumber, t.TenderName, t.[Шалгаруулалтын_төрөл],
 			t.[Тендерийн_дугаар], t.[Тендерийн_төрөл], t.[Батлагдсан_төсөвт_өртөг],
 			t.[Урилгийн_дугаар], t.[Урилгийн_огноо], t.[Үнэлгээ_хийсэн_огноо],
@@ -90,9 +92,10 @@ func (c *GetTender) GetTender() {
 			ISNULL(u.Ner, '') AS CreatedByNer,
 			t.[Тендер_нээх_огноо], t.[Тендер_хаах_огноо],
 			t.[Тендерт_оролцогч], t.[Organization], t.[Ү_Дарга], t.[Ү_Гишүүд],
-			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids]
+			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids], t.[RootTenderId]
 		FROM [Tender].[logtender].[Tender] AS t
 		LEFT JOIN [Tender].[logtender].[Users] AS u ON t.CreatedBy = u.Id
+		WHERE t.RootTenderId IS NULL
 		ORDER BY t.TenderId DESC
 		`
 	}
@@ -144,6 +147,7 @@ func (c *GetTender) GetTender() {
 			&t.ЗҮКДугаар,
 			&t.ЗҮКОгноо,
 			&t.BasketIds,
+			&t.RootTenderId,
 		)
 		if err != nil {
 			log.Printf("❌ Row scan error: %v", err)

@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
-	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,53 +13,66 @@ import (
 	"github.com/astaxie/beego"
 )
 
-// Controller struct
 type PostBasket struct {
 	beego.Controller
 }
 
-// Input struct
 type BasketInput struct {
 	UserId         int         `json:"userId"`
 	BasketName     string      `json:"basketName"`
-	BasketNumber   interface{} `json:"basketNumber"` // optional, ignored — backend generates
+	BasketNumber   interface{} `json:"basketNumber"`
 	BasketType     string      `json:"basketType"`
 	PlanName       string      `json:"planName"`
 	PlanRootNumber int         `json:"planRootNumber"`
-	PublishDate    string      `json:"publishDate"` // YYYY-MM-DD
-	SetDate        string      `json:"setDate"`     // YYYY-MM-DD
+	PublishDate    string      `json:"publishDate"`
+	SetDate        string      `json:"setDate"`
 }
 
-// POST /post/addBasket
 func (c *PostBasket) PostBasket() {
-	fmt.Println("📥 PostBasket endpoint hit")
+	start := time.Now()
+	log.Println("📥 [PostBasket] request received")
 
 	body := c.Ctx.Input.RequestBody
 	if len(body) == 0 {
+		log.Println("❌ [PostBasket] empty request body")
 		c.CustomAbort(http.StatusBadRequest, "Empty request body")
 		return
 	}
+	log.Printf("📦 [PostBasket] RAW payload: %s", string(body))
 
 	var input BasketInput
 	if err := json.Unmarshal(body, &input); err != nil {
+		log.Println("❌ [PostBasket] invalid JSON:", err)
 		c.CustomAbort(http.StatusBadRequest, "Invalid JSON")
 		return
 	}
 
-	// 🕒 Parse dates
+	log.Printf(
+		"🧾 [PostBasket] payload userId=%d planRoot=%d type=%s name=%s",
+		input.UserId,
+		input.PlanRootNumber,
+		input.BasketType,
+		input.BasketName,
+	)
+
 	publishDate, err1 := time.Parse("2006-01-02", input.PublishDate)
 	setDate, err2 := time.Parse("2006-01-02", input.SetDate)
 	if err1 != nil || err2 != nil {
+		log.Printf(
+			"❌ [PostBasket] date parse error publish=%s set=%s",
+			input.PublishDate,
+			input.SetDate,
+		)
 		c.CustomAbort(http.StatusBadRequest, "Invalid date format. Use YYYY-MM-DD")
 		return
 	}
 
-	// ✅ DB connect
 	cfg := getConfig(config.Env)
 	db := connectDB(cfg)
 	defer db.Close()
 
-	// 🧮 Determine next BasketNumber (per user, plan, type)
+	log.Println("🔌 [PostBasket] DB connected (env =", config.Env, ")")
+
 	var nextNum int
 	numQuery := `
 		SELECT ISNULL(MAX(CAST(BasketNumber AS INT)), 0) + 1
@@ -70,13 +83,26 @@ func (c *PostBasket) PostBasket() {
 		numQuery = strings.Replace(numQuery, "[Tender].[dbo]", "[Tender].[logtender]", 1)
 	}
 
-	err := db.QueryRow(numQuery, input.UserId, input.PlanRootNumber, input.BasketType).Scan(&nextNum)
+	err := db.QueryRow(
+		numQuery,
+		input.UserId,
+		input.PlanRootNumber,
+		input.BasketType,
+	).Scan(&nextNum)
+
 	if err != nil {
-		fmt.Println("⚠️ Failed to get next BasketNumber:", err)
+		log.Printf(
+			"⚠️ [PostBasket] failed to calc BasketNumber (user=%d plan=%d type=%s): %v",
+			input.UserId,
+			input.PlanRootNumber,
+			input.BasketType,
+			err,
+		)
 		nextNum = 1
 	}
 
-	// 🧾 Prepare insert query
+	log.Printf("🧮 [PostBasket] next BasketNumber = %d", nextNum)
+
 	insertQuery := `
 		INSERT INTO [Tender].[dbo].[Basket] (
 			UserId, BasketName, BasketNumber, BasketType,
@@ -95,10 +121,11 @@ func (c *PostBasket) PostBasket() {
 	}
 
 	var newID int64
-	err = db.QueryRow(insertQuery,
+	err = db.QueryRow(
+		insertQuery,
 		input.UserId,
 		input.BasketName,
-		strconv.Itoa(nextNum), // ✅ sequential number
+		strconv.Itoa(nextNum),
 		input.BasketType,
 		input.PlanName,
 		input.PlanRootNumber,
@@ -107,13 +134,26 @@ func (c *PostBasket) PostBasket() {
 	).Scan(&newID)
 
 	if err != nil {
-		fmt.Println("❌ Failed to insert basket:", err)
+		log.Printf(
+			"❌ [PostBasket] insert failed user=%d plan=%d type=%s err=%v",
+			input.UserId,
+			input.PlanRootNumber,
+			input.BasketType,
+			err,
+		)
 		c.CustomAbort(http.StatusInternalServerError, "Failed to insert basket")
 		return
 	}
 
-	fmt.Printf("✅ Basket inserted (id=%d, user=%d, plan=%d, type=%s, num=%d)\n",
-		newID, input.UserId, input.PlanRootNumber, input.BasketType, nextNum)
+	log.Printf(
+		"✅ [PostBasket] success id=%d user=%d plan=%d type=%s num=%d (%s)",
+		newID,
+		input.UserId,
+		input.PlanRootNumber,
+		input.BasketType,
+		nextNum,
+		time.Since(start),
+	)
 
 	c.Ctx.Output.SetStatus(http.StatusCreated)
 	c.Data["json"] = map[string]interface{}{
