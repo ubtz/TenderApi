@@ -25,6 +25,7 @@ type BasketItemData struct {
 	CDate        string         `json:"cdate"`
 	UDate        string         `json:"udate"`
 	DEDate       string         `json:"dedate"`
+	DeathDate    string         `json:"deathdate"`
 	Code         string         `json:"code"`
 	CR1ID        string         `json:"cr1id"`
 	CR1Name      string         `json:"cr1name"`
@@ -47,6 +48,7 @@ type BasketItemData struct {
 	RId          string         `json:"rid"`
 	USize        string         `json:"usize"`
 	ZNo          string         `json:"zno"`
+	PkgName      string         `json:"pkgname"`
 	IsArrived    sql.NullBool   `json:"isArrived"`
 	Tailbar      sql.NullString `json:"tailbar"`
 }
@@ -63,6 +65,7 @@ type BasketItemResponse struct {
 	CDate        string  `json:"cdate"`
 	UDate        string  `json:"udate"`
 	DEDate       string  `json:"dedate"`
+	DeathDate    string  `json:"deathdate"`
 	Code         string  `json:"code"`
 	CR1ID        string  `json:"cr1id"`
 	CR1Name      string  `json:"cr1name"`
@@ -85,6 +88,7 @@ type BasketItemResponse struct {
 	RId          string  `json:"rid"`
 	USize        string  `json:"usize"`
 	ZNo          string  `json:"zno"`
+	PkgName      string  `json:"pkgname"`
 	IsArrived    *bool   `json:"isArrived,omitempty"`
 	Tailbar      *string `json:"tailbar,omitempty"`
 }
@@ -140,6 +144,7 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
             bi.cdate,
             bi.udate,
             bi.dedate,
+            ISNULL(CONVERT(VARCHAR(30), bi.deathdate, 126), ''),
             bi.code,
             bi.cr1id,
             bi.cr1name,
@@ -162,11 +167,12 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
             bi.rid,
             bi.usize,
             bi.zno,
+            ISNULL(bi.pkgname, ''),
             bi.isArrived,
             bi.tailbar
         FROM %s bi
         INNER JOIN %s b ON bi.BasketId = b.BasketId
-        WHERE bi.BasketId IN (%s)
+        WHERE bi.BasketId IN (%s) AND ISNULL(bi.IsReturned, 0) = 0
     `, basketItemsTable, basketTable, strings.Join(placeholders, ","))
 
 	fmt.Println("🧾 Final Query:", query)
@@ -196,6 +202,7 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			&bi.CDate,
 			&bi.UDate,
 			&bi.DEDate,
+			&bi.DeathDate,
 			&bi.Code,
 			&bi.CR1ID,
 			&bi.CR1Name,
@@ -218,6 +225,7 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			&bi.RId,
 			&bi.USize,
 			&bi.ZNo,
+			&bi.PkgName,
 			&bi.IsArrived,
 			&bi.Tailbar,
 		)
@@ -238,6 +246,7 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			CDate:        bi.CDate,
 			UDate:        bi.UDate,
 			DEDate:       bi.DEDate,
+			DeathDate:    bi.DeathDate,
 			Code:         bi.Code,
 			CR1ID:        bi.CR1ID,
 			CR1Name:      bi.CR1Name,
@@ -260,6 +269,7 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			RId:          bi.RId,
 			USize:        bi.USize,
 			ZNo:          bi.ZNo,
+			PkgName:      bi.PkgName,
 		}
 
 		if bi.IsArrived.Valid {

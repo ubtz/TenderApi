@@ -2,6 +2,7 @@ package controllers
 
 import (
 	config "TenderApi/conf"
+	"net/http"
 	"strconv"
 
 	"github.com/astaxie/beego"
@@ -29,16 +30,31 @@ func (c *DeleteBasketItem) DeleteBasketItem() {
 	db := connectDB(cfg)
 	defer db.Close()
 
-	// Prepare delete query
-	query := `DELETE FROM [Tender].[dbo].[BasketItems] WHERE BasketItemId = @p1`
+	claims, err := ClaimsForController(&c.Controller)
+	if err != nil || claims.UserID == 0 {
+		c.CustomAbort(http.StatusUnauthorized, "Invalid user session")
+		return
+	}
+
+	query := `
+		DELETE item
+		FROM [Tender].[dbo].[BasketItems] AS item
+		INNER JOIN [Tender].[dbo].[Basket] AS basket ON basket.BasketId = item.BasketId
+		WHERE item.BasketItemId = @p1 AND basket.UserId = @p2
+	`
 
 	// If prod DB uses different schema
 	if config.Env == "prod" {
-		query = `DELETE FROM [Tender].[logtender].[BasketItems] WHERE BasketItemId = @p1`
+		query = `
+			DELETE item
+			FROM [Tender].[logtender].[BasketItems] AS item
+			INNER JOIN [Tender].[logtender].[Basket] AS basket ON basket.BasketId = item.BasketId
+			WHERE item.BasketItemId = @p1 AND basket.UserId = @p2
+		`
 	}
 
 	// Execute delete
-	result, err := db.Exec(query, id)
+	result, err := db.Exec(query, id, claims.UserID)
 	if err != nil {
 		c.CustomAbort(500, "Failed to delete BasketItem: "+err.Error())
 		return

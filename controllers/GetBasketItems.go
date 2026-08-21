@@ -41,8 +41,10 @@ type BasketItem struct {
 	Price    sql.NullFloat64 `json:"price"`
 	PriceSum sql.NullFloat64 `json:"pricesum"`
 
-	PkgNo   sql.NullString `json:"pkgno"`
-	PkgDate sql.NullString `json:"pkgdate"`
+	PkgNo     sql.NullString `json:"pkgno"`
+	PkgName   sql.NullString `json:"pkgname"`
+	PkgDate   sql.NullString `json:"pkgdate"`
+	DeathDate sql.NullString `json:"deathdate"`
 
 	IsArrived sql.NullBool   `json:"isArrived"`
 	Tailbar   sql.NullString `json:"tailbar"`
@@ -79,7 +81,9 @@ func (c *GetBasketItems) GetBasketItems() {
 		bi.price,
 		bi.pricesum,
 		bi.pkgno,
+		bi.pkgname,
 		bi.pkgdate,
+		bi.deathdate,
 		bi.isArrived,
 		bi.Tailbar,
 
@@ -138,6 +142,7 @@ func (c *GetBasketItems) GetBasketItems() {
 		END AS current_step_key
 
 	FROM [Tender].[dbo].[BasketItems] bi
+	WHERE ISNULL(bi.IsReturned, 0) = 0
 	`
 
 	if config.Env == "prod" {
@@ -158,7 +163,9 @@ func (c *GetBasketItems) GetBasketItems() {
 			bi.price,
 			bi.pricesum,
 			bi.pkgno,
+			bi.pkgname,
 			bi.pkgdate,
+			bi.deathdate,
 			bi.isArrived,
 			bi.Tailbar,
 
@@ -211,6 +218,7 @@ func (c *GetBasketItems) GetBasketItems() {
 			END AS current_step_key
 
 		FROM [Tender].[logtender].[BasketItems] bi
+		WHERE ISNULL(bi.IsReturned, 0) = 0
 		`
 	}
 
@@ -241,7 +249,9 @@ func (c *GetBasketItems) GetBasketItems() {
 			&it.Price,
 			&it.PriceSum,
 			&it.PkgNo,
+			&it.PkgName,
 			&it.PkgDate,
+			&it.DeathDate,
 			&it.IsArrived,
 			&it.Tailbar,
 			&it.CurrentStepKey,

@@ -33,6 +33,7 @@ func (c *GetBasketIdsByRootNum) Get() {
             t.Тендерийн_дугаар
         FROM [Tender].[dbo].[Tender] t
         WHERE t.RootTenderId IS NULL
+          AND ISNULL(t.IsDeleted, 0) = 0
           AND t.PlanRootNumber = @rootNum
           AND t.Basket_Ids IS NOT NULL
     `
@@ -44,6 +45,7 @@ func (c *GetBasketIdsByRootNum) Get() {
             t.Тендерийн_дугаар
         FROM [Tender].[logtender].[Tender] t
         WHERE t.RootTenderId IS NULL
+          AND ISNULL(t.IsDeleted, 0) = 0
           AND t.PlanRootNumber = @rootNum
           AND t.Basket_Ids IS NOT NULL
         `

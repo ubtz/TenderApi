@@ -14,6 +14,8 @@ type Geree struct {
 	GereeId                int     `json:"GereeId"`
 	TenderId               int     `json:"TenderId"`
 	ТендерийнДугаар        string  `json:"тендерийн_дугаар"`
+	TenderName             string  `json:"tender_name"`
+	ТендерийнТөрөл         string  `json:"тендерийн_төрөл"`
 	CreatedAt              string  `json:"CreatedAt"`
 	ГэрээнийДугаар         string  `json:"гэрээний_дугаар"`
 	ГэрээБайгуулсанОгноо   string  `json:"гэрээ_байгуулсан_огноо"`
@@ -57,6 +59,8 @@ func (c *GetGeree) GetGeree() {
 		g.[GereeId],
 		g.[TenderId],
 		t.[Тендерийн_дугаар],
+		t.[TenderName],
+		t.[Тендерийн_төрөл],
 		g.[CreatedAt],
 		g.[Гэрээний_дугаар],
 		g.[Гэрээ_байгуулсан_огноо],
@@ -99,6 +103,8 @@ func (c *GetGeree) GetGeree() {
 			g.[GereeId],
 			g.[TenderId],
 			t.[Тендерийн_дугаар],
+			t.[TenderName],
+			t.[Тендерийн_төрөл],
 			g.[CreatedAt],
 			g.[Гэрээний_дугаар],
 			g.[Гэрээ_байгуулсан_огноо],
@@ -151,7 +157,8 @@ func (c *GetGeree) GetGeree() {
 	for rows.Next() {
 		var (
 			gId, tId                                      int
-			тендерийнДугаар, createdAt                    sql.NullString
+			тендерийнДугаар, tenderName, tenderType       sql.NullString
+			createdAt                                     sql.NullString
 			gdugaar, gdate, gaan, bn                      sql.NullString
 			reg, huu, val, tn, tognoo                     sql.NullString
 			thh, nn, nh, an, gh                           sql.NullString
@@ -162,7 +169,7 @@ func (c *GetGeree) GetGeree() {
 		)
 
 		err := rows.Scan(
-			&gId, &tId, &тендерийнДугаар, &createdAt,
+			&gId, &tId, &тендерийнДугаар, &tenderName, &tenderType, &createdAt,
 			&gdugaar, &gdate, &gaan, &bn,
 			&reg, &huu, &val, &gdun,
 			&tn, &tognoo, &thh,
@@ -182,6 +189,8 @@ func (c *GetGeree) GetGeree() {
 			GereeId:                gId,
 			TenderId:               tId,
 			ТендерийнДугаар:        nullToStr(тендерийнДугаар),
+			TenderName:             nullToStr(tenderName),
+			ТендерийнТөрөл:         nullToStr(tenderType),
 			CreatedAt:              nullToStr(createdAt),
 			ГэрээнийДугаар:         nullToStr(gdugaar),
 			ГэрээБайгуулсанОгноо:   nullToStr(gdate),

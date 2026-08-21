@@ -75,6 +75,7 @@ func (c *GetTender) GetTender() {
 		FROM [Tender].[dbo].[Tender] AS t
 		LEFT JOIN [Tender].[dbo].[Users] AS u ON t.CreatedBy = u.Id
 		WHERE t.RootTenderId IS NULL
+		  AND ISNULL(t.IsDeleted, 0) = 0
 		ORDER BY t.TenderId DESC
 	`
 
@@ -96,6 +97,7 @@ func (c *GetTender) GetTender() {
 		FROM [Tender].[logtender].[Tender] AS t
 		LEFT JOIN [Tender].[logtender].[Users] AS u ON t.CreatedBy = u.Id
 		WHERE t.RootTenderId IS NULL
+		  AND ISNULL(t.IsDeleted, 0) = 0
 		ORDER BY t.TenderId DESC
 		`
 	}

@@ -32,6 +32,11 @@ type User struct {
 
 func (c *Register) PostRegister() {
 	fmt.Println("📥 PostRegister endpoint hit")
+	claims, claimsErr := ClaimsForController(&c.Controller)
+	if claimsErr != nil || claims.Role != "Удирдлага" {
+		c.CustomAbort(403, "Management role is required")
+		return
+	}
 
 	body := c.Ctx.Input.RequestBody
 	if len(body) == 0 {
@@ -50,7 +55,11 @@ func (c *Register) PostRegister() {
 		return
 	}
 
-	newUser.PasswordHash = hashPassword(newUser.Password)
+	newUser.PasswordHash, err = hashPassword(newUser.Password)
+	if err != nil {
+		c.CustomAbort(500, "Failed to secure password")
+		return
+	}
 
 	cfg := getConfig(config.Env)
 	db := connectDB(cfg)

@@ -2,12 +2,21 @@ package controllers
 
 import (
 	config "TenderApi/conf"
+	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"database/sql"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/astaxie/beego"
@@ -19,15 +28,121 @@ type UserLogin struct {
 }
 
 type Claims struct {
-	Email string `json:"email"`
+	Email     string `json:"email"`
+	UserID    int    `json:"user_id"`
+	SessionID string `json:"session_id"`
+	Role      string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-var jwtSecret = []byte("your_secret_key")
+const authTokenDuration = 15 * time.Minute
 
-func hashPassword(password string) string {
+var (
+	developmentJWTSecret     []byte
+	developmentJWTSecretOnce sync.Once
+)
+
+func getJWTSecret() ([]byte, error) {
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if len(secret) >= 32 {
+		return []byte(secret), nil
+	}
+	if secret != "" || config.Env == "prod" {
+		return nil, fmt.Errorf("JWT_SECRET must contain at least 32 characters")
+	}
+
+	developmentJWTSecretOnce.Do(func() {
+		developmentJWTSecret = make([]byte, 32)
+		if _, err := rand.Read(developmentJWTSecret); err != nil {
+			developmentJWTSecret = nil
+			return
+		}
+		log.Println("WARNING: JWT_SECRET is not configured; using a temporary development secret")
+	})
+	if len(developmentJWTSecret) != 32 {
+		return nil, fmt.Errorf("could not generate development JWT secret")
+	}
+	return developmentJWTSecret, nil
+}
+
+func legacyPasswordHash(password string) string {
 	hash := sha256.Sum256([]byte(password))
 	return hex.EncodeToString(hash[:])
+}
+
+const passwordHashIterations = 210000
+
+func derivePasswordKey(password, salt []byte, iterations int) []byte {
+	block := make([]byte, len(salt)+4)
+	copy(block, salt)
+	binary.BigEndian.PutUint32(block[len(salt):], 1)
+	mac := hmac.New(sha256.New, password)
+	mac.Write(block)
+	current := mac.Sum(nil)
+	derived := append([]byte(nil), current...)
+	for iteration := 1; iteration < iterations; iteration++ {
+		mac.Reset()
+		mac.Write(current)
+		current = mac.Sum(nil)
+		for index := range derived {
+			derived[index] ^= current[index]
+		}
+	}
+	return derived
+}
+
+func hashPassword(password string) (string, error) {
+	salt := make([]byte, 16)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+	hash := derivePasswordKey([]byte(password), salt, passwordHashIterations)
+	return fmt.Sprintf("pbkdf2-sha256$%d$%s$%s", passwordHashIterations, hex.EncodeToString(salt), hex.EncodeToString(hash)), nil
+}
+
+func verifyPassword(storedHash, password string) bool {
+	parts := strings.Split(storedHash, "$")
+	if len(parts) == 4 && parts[0] == "pbkdf2-sha256" {
+		iterations, err := strconv.Atoi(parts[1])
+		salt, saltErr := hex.DecodeString(parts[2])
+		expected, hashErr := hex.DecodeString(parts[3])
+		if err != nil || saltErr != nil || hashErr != nil || iterations < 100000 {
+			return false
+		}
+		actual := derivePasswordKey([]byte(password), salt, iterations)
+		return len(actual) == len(expected) && subtle.ConstantTimeCompare(actual, expected) == 1
+	}
+	actualLegacy := legacyPasswordHash(password)
+	return len(storedHash) == len(actualLegacy) && subtle.ConstantTimeCompare([]byte(storedHash), []byte(actualLegacy)) == 1
+}
+
+func newSessionID() (string, error) {
+	bytes := make([]byte, 16)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(bytes), nil
+}
+
+func createAuthToken(email string, userID int, sessionID, role string) (string, error) {
+	secret, err := getJWTSecret()
+	if err != nil {
+		return "", err
+	}
+	expirationTime := time.Now().Add(authTokenDuration)
+	claims := &Claims{
+		Email:     email,
+		UserID:    userID,
+		SessionID: sessionID,
+		Role:      role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(secret)
 }
 
 func (c *UserLogin) PostLogin() {
@@ -93,24 +208,33 @@ func (c *UserLogin) PostLogin() {
 		return
 	}
 
-	if user.PasswordHash != hashPassword(loginRequest.Password) {
+	if !verifyPassword(user.PasswordHash, loginRequest.Password) {
 		log.Println("❌ Invalid password for:", loginRequest.Email)
 		c.Data["json"] = map[string]string{"error": "Invalid credentials"}
 		c.ServeJSON()
 		return
 	}
+	if !strings.HasPrefix(user.PasswordHash, "pbkdf2-sha256$") {
+		if upgradedHash, hashErr := hashPassword(loginRequest.Password); hashErr == nil {
+			updateQuery := `UPDATE [Tender].[dbo].[Users] SET PasswordHash = @p1 WHERE Id = @p2`
+			if config.Env == "prod" {
+				updateQuery = `UPDATE [Tender].[logtender].[Users] SET PasswordHash = @p1 WHERE Id = @p2`
+			}
+			if _, updateErr := db.Exec(updateQuery, upgradedHash, user.Id); updateErr != nil {
+				log.Println("Failed to upgrade password hash:", updateErr)
+			}
+		}
+	}
 
 	// ✅ Generate JWT token
-	expirationTime := time.Now().Add(24 * time.Hour)
-	claims := &Claims{
-		Email: user.Email.String,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-		},
+	sessionID, err := newSessionID()
+	if err != nil {
+		log.Println("Failed to generate session id:", err)
+		c.CustomAbort(http.StatusInternalServerError, "Could not generate session")
+		return
 	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(jwtSecret)
+
+	tokenString, err := createAuthToken(user.Email.String, user.Id, sessionID, user.Erh.String)
 	if err != nil {
 		log.Println("❌ Failed to generate JWT token:", err)
 		c.CustomAbort(http.StatusInternalServerError, "Could not generate token")
@@ -138,10 +262,17 @@ func (c *UserLogin) PostLogin() {
 		log.Printf("📝 Login logged for user %s (%d)", user.Username, user.Id)
 	}
 
+	if err := createUserSession(db, user.Id, user.Username, user.Email.String, sessionID); err != nil {
+		log.Println("Failed to insert user session:", err)
+	} else {
+		log.Printf("Session started for user %s (%d), session=%s", user.Username, user.Id, sessionID)
+	}
+
 	// ✅ Send response
 	c.Data["json"] = map[string]interface{}{
-		"token":   tokenString,
-		"message": "Login successful",
+		"token":      tokenString,
+		"session_id": sessionID,
+		"message":    "Login successful",
 		"user": map[string]interface{}{
 			"id":         user.Id,
 			"username":   user.Username,

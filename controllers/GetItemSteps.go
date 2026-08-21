@@ -65,7 +65,7 @@ func (c *GetItemSteps) GetItemSteps() {
 		udate,
 		AddedAt
 	FROM [Tender].[dbo].[BasketItems]
-	WHERE BasketItemId = @itemId
+	WHERE BasketItemId = @itemId AND ISNULL(IsReturned, 0) = 0
 	`
 
 	if config.Env == "prod" {
@@ -78,7 +78,7 @@ func (c *GetItemSteps) GetItemSteps() {
 			udate,
 			AddedAt
 		FROM [Tender].[logtender].[BasketItems]
-		WHERE BasketItemId = @itemId
+		WHERE BasketItemId = @itemId AND ISNULL(IsReturned, 0) = 0
 		`
 	}
 

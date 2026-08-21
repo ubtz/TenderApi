@@ -22,19 +22,19 @@ type PasswordChangeRequest struct {
 func (c *UserPasswordChange) Post() {
 	var req PasswordChangeRequest
 
-	// 🔍 Log request body for debugging
-	beego.Info("📩 Raw body:", string(c.Ctx.Input.RequestBody))
-
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
 		beego.Error("❌ JSON unmarshal error:", err)
 		c.CustomAbort(http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	beego.Info("🧠 Parsed request:", req)
-
 	if req.UserId == 0 || req.OldPassword == "" || req.NewPassword == "" {
 		c.CustomAbort(http.StatusBadRequest, "Missing required fields")
+		return
+	}
+	claims, claimsErr := ClaimsForController(&c.Controller)
+	if claimsErr != nil || claims.UserID != req.UserId {
+		c.CustomAbort(http.StatusForbidden, "Cannot change another user's password")
 		return
 	}
 
@@ -59,14 +59,17 @@ func (c *UserPasswordChange) Post() {
 	}
 
 	// Compare old password
-	oldHash := hashPassword(req.OldPassword)
-	if storedHash != oldHash {
+	if !verifyPassword(storedHash, req.OldPassword) {
 		c.CustomAbort(http.StatusBadRequest, "Old password is incorrect")
 		return
 	}
 
 	// Hash and update new password
-	newHash := hashPassword(req.NewPassword)
+	newHash, hashErr := hashPassword(req.NewPassword)
+	if hashErr != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Failed to secure password")
+		return
+	}
 	updateQuery := `UPDATE [Tender].[dbo].[Users] SET PasswordHash = @p1 WHERE Id = @p2`
 	if config.Env == "prod" {
 		updateQuery = `UPDATE [Tender].[logtender].[Users] SET PasswordHash = @p1 WHERE Id = @p2`

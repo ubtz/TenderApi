@@ -73,6 +73,14 @@ func (c *PostGeree) PostGeree() {
 		c.ServeJSON()
 		return
 	}
+	if input.ААН_регистер == nil || strings.TrimSpace(*input.ААН_регистер) == "" {
+		c.Ctx.Output.SetStatus(http.StatusBadRequest)
+		c.Data["json"] = map[string]string{"error": "ААН регистер оруулах шаардлагатай"}
+		c.ServeJSON()
+		return
+	}
+	trimmedRegister := strings.TrimSpace(*input.ААН_регистер)
+	input.ААН_регистер = &trimmedRegister
 
 	// 🧠 Debug values
 	log.Printf("📋 Parsed input: %+v", input)

@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/astaxie/beego"
 	mssql "github.com/denisenkom/go-mssqldb"
@@ -21,23 +24,31 @@ type DBConfig struct {
 }
 
 func getConfig(env string) DBConfig {
-	if env == "prod" {
-		return DBConfig{
-			Server:   "192.168.4.123",
-			Port:     1433,
-			User:     "logtender",
-			Password: "UBjsc@tender.nrp",
-			Database: "tender",
+	env = strings.ToUpper(strings.TrimSpace(env))
+	getValue := func(name string) string {
+		value := os.Getenv(name + "_" + env)
+		if value == "" {
+			value = os.Getenv(name)
 		}
+		return value
 	}
-	// Default to test
+
+	port, err := strconv.Atoi(getValue("DB_PORT"))
+	if err != nil || port <= 0 {
+		port = 1433
+	}
 	return DBConfig{
-		Server:   "172.30.30.30",
-		Port:     1433,
-		User:     "sa",
-		Password: "test",
-		Database: "test",
+		Server:   getValue("DB_SERVER"),
+		Port:     port,
+		User:     getValue("DB_USER"),
+		Password: getValue("DB_PASSWORD"),
+		Database: getValue("DB_NAME"),
 	}
+}
+
+func (c *MainController) Get() {
+	c.Data["json"] = map[string]string{"status": "ok", "service": "TenderApi"}
+	c.ServeJSON()
 }
 
 func connectDB(cfg DBConfig) *sql.DB {
@@ -193,15 +204,11 @@ func (c *MainController) FetchDataTable() {
 
 func (c *MainController) FetchnormTypes() {
 
-	server := "172.30.30.30" // SQL Server instance name
-	port := 1433             // SQL Server default port
-	user := "sa"             // Your MSSQL username
-	password := "test"       // Your MSSQL password
-	database := "test"
+	cfg := getConfig(os.Getenv("APP_ENV"))
 
 	// Convert port to string
 	// connString := fmt.Sprintf("server=%s;user id=%s;password=%s;port=%s;database=%s;encrypt=disable;sslmode=disable;connection+timeout=60;log=63", server, user, password, port, database)
-	connString := fmt.Sprintf("server=%s;port=%d;user id=%s;password=%s;database=%s;encrypt=disable", server, port, user, password, database)
+	connString := fmt.Sprintf("server=%s;port=%d;user id=%s;password=%s;database=%s;encrypt=disable", cfg.Server, cfg.Port, cfg.User, cfg.Password, cfg.Database)
 
 	// fmt.Println(connString)
 

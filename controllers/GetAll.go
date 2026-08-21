@@ -30,11 +30,13 @@ type BasketItemDTO struct {
 	Tech_Tod     *sql.NullString `json:"tech_tod"`
 	Tusuv        *sql.NullString `json:"tusuv"`
 	PkgNo        *sql.NullString `json:"pkgno"`
+	PkgName      *sql.NullString `json:"pkgname"`
 	TechDate     *sql.NullString `json:"techdate"`
 	TechUrl      *sql.NullString `json:"techurl"`
 	PlanDate     *sql.NullString `json:"plandate"`
 	PlanUrl      *sql.NullString `json:"planurl"`
 	PkgDate      *sql.NullString `json:"pkgdate"`
+	DeathDate    *sql.NullString `json:"deathdate"`
 	Key          *sql.NullString `json:"key"`
 }
 
@@ -96,15 +98,18 @@ func (c *GetAll) GetAll() {
 			bi.Tusuv,
 			bi.State,
 			bi.pkgno,
+			bi.pkgname,
 			bi.techdate,
 			bi.techurl,
 			bi.plandate,
 			bi.planurl,
 			bi.pkgdate,
+			ISNULL(CONVERT(VARCHAR(30), bi.deathdate, 126), ''),
 			bi.[key]
 		FROM [Tender].[dbo].[Basket] b
 		JOIN [Tender].[dbo].[BasketItems] bi 
 			ON bi.BasketId = b.BasketId
+		WHERE ISNULL(bi.IsReturned, 0) = 0
 		ORDER BY 
 			b.PlanRootNumber ASC, 
 			b.BasketType ASC,
@@ -140,15 +145,18 @@ func (c *GetAll) GetAll() {
 			bi.Tusuv,
 			bi.State,
 			bi.pkgno,
+			bi.pkgname,
 			bi.techdate,
 			bi.techurl,
 			bi.plandate,
 			bi.planurl,
 			bi.pkgdate,
+			ISNULL(CONVERT(VARCHAR(30), bi.deathdate, 126), ''),
 			bi.[key]
 		FROM [Tender].[logtender].[Basket] b
 		JOIN [Tender].[logtender].[BasketItems] bi 
 			ON bi.BasketId = b.BasketId
+		WHERE ISNULL(bi.IsReturned, 0) = 0
 		ORDER BY 
 			b.PlanRootNumber ASC,
 			b.BasketType ASC,
@@ -171,7 +179,7 @@ func (c *GetAll) GetAll() {
 	for rows.Next() {
 		var (
 			rootNum, basketName, basketNumber, basketType, planName, barcode, code, dname, zno, c4name, crmarkname, mname, usize string
-			tech_Tod, tusuv, pkgno, techdate, techurl, plandate, planurl, pkgdate, key                                           sql.NullString
+			tech_Tod, tusuv, pkgno, pkgname, techdate, techurl, plandate, planurl, pkgdate, deathdate, key                       sql.NullString
 			addedAt, publishDate, setDate                                                                                        sql.NullTime
 			basketId, userId, basketItemId                                                                                       int
 			price, qty, pricesum                                                                                                 float64
@@ -207,11 +215,13 @@ func (c *GetAll) GetAll() {
 			&tusuv,
 			&state,
 			&pkgno,
+			&pkgname,
 			&techdate,
 			&techurl,
 			&plandate,
 			&planurl,
 			&pkgdate,
+			&deathdate,
 			&key,
 		)
 		if err != nil {
@@ -268,11 +278,13 @@ func (c *GetAll) GetAll() {
 			Tech_Tod:     &tech_Tod,
 			Tusuv:        &tusuv,
 			PkgNo:        &pkgno,
+			PkgName:      &pkgname,
 			TechDate:     &techdate,
 			TechUrl:      &techurl,
 			PlanDate:     &plandate,
 			PlanUrl:      &planurl,
 			PkgDate:      &pkgdate,
+			DeathDate:    &deathdate,
 			Key:          &key,
 		})
 	}

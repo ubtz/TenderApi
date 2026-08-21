@@ -46,11 +46,12 @@ func (c *GetAllValid) GetAllValid() {
 		bi.crmarkname,
 		bi.Tech_Tod,
 		bi.Tusuv,
-		bi.State
+		bi.State,
+		bi.pkgname
 	FROM [Tender].[dbo].[Basket] b
 	JOIN [Tender].[dbo].[BasketItems] bi 
 		ON bi.BasketId = b.BasketId
-	WHERE b.isValid = 1
+	WHERE b.isValid = 1 AND ISNULL(bi.IsReturned, 0) = 0
 	ORDER BY 
 		b.PlanRootNumber ASC, 
 		b.BasketType ASC,
@@ -81,14 +82,15 @@ func (c *GetAllValid) GetAllValid() {
 			bi.usize,
 			bi.zno,
 			bi.cr4name,
-			bi.crmarkname
+			bi.crmarkname,
 			bi.Tech_Tod,
 			bi.Tusuv,
-			bi.State
+			bi.State,
+			bi.pkgname
 		FROM [Tender].[logtender].[Basket] b
 		JOIN [Tender].[logtender].[BasketItems] bi 
 			ON bi.BasketId = b.BasketId
-		WHERE b.isValid = 1
+		WHERE b.isValid = 1 AND ISNULL(bi.IsReturned, 0) = 0
 		ORDER BY 
 			b.PlanRootNumber ASC,
 			b.BasketType ASC,
@@ -111,7 +113,7 @@ func (c *GetAllValid) GetAllValid() {
 	for rows.Next() {
 		var (
 			rootNum, basketName, basketNumber, basketType, planName, barcode, code, dname, zno, c4name, crmarkname, mname, usize string
-			tech_Tod, tusuv                                                                                                      sql.NullString
+			tech_Tod, tusuv, pkgname                                                                                             sql.NullString
 			addedAt, publishDate, setDate                                                                                        sql.NullTime
 			basketId, userId, basketItemId                                                                                       int
 			price, qty, pricesum                                                                                                 float64
@@ -146,6 +148,7 @@ func (c *GetAllValid) GetAllValid() {
 			&tech_Tod,
 			&tusuv,
 			&state,
+			&pkgname,
 		)
 		if err != nil {
 			fmt.Println("❌ Row scan error:", err)
@@ -197,6 +200,7 @@ func (c *GetAllValid) GetAllValid() {
 			State:        state,
 			Tech_Tod:     &tech_Tod,
 			Tusuv:        &tusuv,
+			PkgName:      &pkgname,
 		})
 	}
 

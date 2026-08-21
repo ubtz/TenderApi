@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -26,6 +27,7 @@ type BasketInput struct {
 	PlanRootNumber int         `json:"planRootNumber"`
 	PublishDate    string      `json:"publishDate"`
 	SetDate        string      `json:"setDate"`
+	IsTemp         bool        `json:"isTemp"`
 }
 
 func (c *PostBasket) PostBasket() {
@@ -38,14 +40,18 @@ func (c *PostBasket) PostBasket() {
 		c.CustomAbort(http.StatusBadRequest, "Empty request body")
 		return
 	}
-	log.Printf("📦 [PostBasket] RAW payload: %s", string(body))
-
 	var input BasketInput
 	if err := json.Unmarshal(body, &input); err != nil {
 		log.Println("❌ [PostBasket] invalid JSON:", err)
 		c.CustomAbort(http.StatusBadRequest, "Invalid JSON")
 		return
 	}
+	claims, err := ClaimsForController(&c.Controller)
+	if err != nil || claims.UserID == 0 {
+		c.CustomAbort(http.StatusUnauthorized, "Invalid user session")
+		return
+	}
+	input.UserId = claims.UserID
 
 	log.Printf(
 		"🧾 [PostBasket] payload userId=%d planRoot=%d type=%s name=%s",
@@ -70,8 +76,59 @@ func (c *PostBasket) PostBasket() {
 	cfg := getConfig(config.Env)
 	db := connectDB(cfg)
 	defer db.Close()
+	tx, err := db.Begin()
+	if err != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Failed to start basket transaction")
+		return
+	}
+	defer tx.Rollback()
+
+	lockResource := "TenderBasket:" + strconv.Itoa(input.UserId) + ":" + strconv.Itoa(input.PlanRootNumber) + ":" + input.BasketType
+	var lockResult int
+	if err := tx.QueryRow(`
+		DECLARE @result int;
+		EXEC @result = sp_getapplock
+			@Resource = @p1,
+			@LockMode = 'Exclusive',
+			@LockOwner = 'Transaction',
+			@LockTimeout = 10000;
+		SELECT @result;
+	`, lockResource).Scan(&lockResult); err != nil || lockResult < 0 {
+		c.CustomAbort(http.StatusConflict, "Could not lock basket creation")
+		return
+	}
 
 	log.Println("🔌 [PostBasket] DB connected (env =", config.Env, ")")
+
+	if input.IsTemp {
+		tempQuery := `
+			SELECT TOP (1) BasketId, CAST(BasketNumber AS INT)
+			FROM [Tender].[dbo].[Basket]
+			WHERE UserId = @p1 AND ISNULL(IsTemp, 0) = 1
+			ORDER BY BasketId
+		`
+		if config.Env == "prod" {
+			tempQuery = strings.Replace(tempQuery, "[Tender].[dbo]", "[Tender].[logtender]", 1)
+		}
+
+		var existingID int64
+		var existingNumber int
+		err := tx.QueryRow(tempQuery, input.UserId).Scan(&existingID, &existingNumber)
+		if err == nil {
+			c.Data["json"] = map[string]interface{}{
+				"message":       "Temporary basket already exists",
+				"basket_id":     existingID,
+				"basket_number": existingNumber,
+			}
+			c.ServeJSON()
+			return
+		}
+		if err != sql.ErrNoRows {
+			log.Printf("Temporary basket lookup failed: %v", err)
+			c.CustomAbort(http.StatusInternalServerError, "Failed to check temporary basket")
+			return
+		}
+	}
 
 	var nextNum int
 	numQuery := `
@@ -83,7 +140,7 @@ func (c *PostBasket) PostBasket() {
 		numQuery = strings.Replace(numQuery, "[Tender].[dbo]", "[Tender].[logtender]", 1)
 	}
 
-	err := db.QueryRow(
+	err = tx.QueryRow(
 		numQuery,
 		input.UserId,
 		input.PlanRootNumber,
@@ -107,13 +164,13 @@ func (c *PostBasket) PostBasket() {
 		INSERT INTO [Tender].[dbo].[Basket] (
 			UserId, BasketName, BasketNumber, BasketType,
 			PlanName, PlanRootNumber,
-			PublishDate, SetDate, AddedAt, isValid
+			PublishDate, SetDate, AddedAt, isValid, isTemp
 		)
 		OUTPUT INSERTED.BasketId
 		VALUES (
 			@p1, @p2, @p3, @p4,
 			@p5, @p6, @p7,
-			@p8, GETDATE(), CAST(0 AS BIT)
+			@p8, GETDATE(), CAST(0 AS BIT), @p9
 		)
 	`
 	if config.Env == "prod" {
@@ -121,7 +178,7 @@ func (c *PostBasket) PostBasket() {
 	}
 
 	var newID int64
-	err = db.QueryRow(
+	err = tx.QueryRow(
 		insertQuery,
 		input.UserId,
 		input.BasketName,
@@ -131,6 +188,7 @@ func (c *PostBasket) PostBasket() {
 		input.PlanRootNumber,
 		publishDate,
 		setDate,
+		input.IsTemp,
 	).Scan(&newID)
 
 	if err != nil {
@@ -142,6 +200,10 @@ func (c *PostBasket) PostBasket() {
 			err,
 		)
 		c.CustomAbort(http.StatusInternalServerError, "Failed to insert basket")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Failed to commit basket")
 		return
 	}
 

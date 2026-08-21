@@ -7,6 +7,6 @@ var Env string
 func init() {
 	Env = os.Getenv("APP_ENV")
 	if Env == "" {
-		Env = "test" // fallback
+		Env = "prod" // fallback
 	}
 }

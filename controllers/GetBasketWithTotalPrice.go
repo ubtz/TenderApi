@@ -97,7 +97,7 @@ func (c *GetBasketWithTotalPrice) GetBasketWithTotalPrice() {
 		err = db.QueryRow(`
 			SELECT ISNULL(SUM(CAST(pricesum AS FLOAT)), 0)
 			FROM [Tender].[dbo].[BasketItems]
-			WHERE BasketId = @p1`, b.BasketId).Scan(&b.TotalPrice)
+			WHERE BasketId = @p1 AND ISNULL(IsReturned, 0) = 0`, b.BasketId).Scan(&b.TotalPrice)
 		if err != nil {
 			fmt.Println("⚠️ Failed to get total price for BasketId", b.BasketId, ":", err)
 			b.TotalPrice = 0
@@ -106,7 +106,7 @@ func (c *GetBasketWithTotalPrice) GetBasketWithTotalPrice() {
 			err = db.QueryRow(`
 			SELECT ISNULL(SUM(CAST(pricesum AS FLOAT)), 0)
 			FROM [Tender].[logtender].[BasketItems]
-			WHERE BasketId = @p1`, b.BasketId).Scan(&b.TotalPrice)
+			WHERE BasketId = @p1 AND ISNULL(IsReturned, 0) = 0`, b.BasketId).Scan(&b.TotalPrice)
 			if err != nil {
 				fmt.Println("⚠️ Failed to get total price for BasketId", b.BasketId, ":", err)
 				b.TotalPrice = 0
@@ -116,12 +116,12 @@ func (c *GetBasketWithTotalPrice) GetBasketWithTotalPrice() {
 		dnameRows, err := db.Query(`
 			SELECT DISTINCT dname
 			FROM [Tender].[dbo].[BasketItems]
-			WHERE BasketId = @p1`, b.BasketId)
+			WHERE BasketId = @p1 AND ISNULL(IsReturned, 0) = 0`, b.BasketId)
 		if config.Env == "prod" {
 			dnameRows, err = db.Query(`
 			SELECT DISTINCT dname
 			FROM [Tender].[logtender].[BasketItems]
-			WHERE BasketId = @p1`, b.BasketId)
+			WHERE BasketId = @p1 AND ISNULL(IsReturned, 0) = 0`, b.BasketId)
 		}
 		if err != nil {
 			fmt.Println("⚠️ Failed to get dnames for BasketId", b.BasketId, ":", err)

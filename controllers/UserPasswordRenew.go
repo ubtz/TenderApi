@@ -19,12 +19,14 @@ type PasswordRenewRequest struct {
 func (c *UserPasswordRenew) Post() {
 	var req PasswordRenewRequest
 
-	// 🔍 Log incoming body
-	beego.Info("📩 Raw body:", string(c.Ctx.Input.RequestBody))
-
 	if err := json.Unmarshal(c.Ctx.Input.RequestBody, &req); err != nil {
 		beego.Error("❌ JSON unmarshal error:", err)
 		c.CustomAbort(http.StatusBadRequest, "Invalid request body")
+		return
+	}
+	claims, claimsErr := ClaimsForController(&c.Controller)
+	if claimsErr != nil || claims.Role != "Удирдлага" {
+		c.CustomAbort(http.StatusForbidden, "Management role is required")
 		return
 	}
 
@@ -55,9 +57,17 @@ func (c *UserPasswordRenew) Post() {
 		return
 	}
 
-	// ✅ Set new password = "1234"
-	newPassword := "1234"
-	newHash := hashPassword(newPassword)
+	temporaryPassword, passwordErr := newSessionID()
+	if passwordErr != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Failed to generate temporary password")
+		return
+	}
+	newPassword := temporaryPassword[:12]
+	newHash, hashErr := hashPassword(newPassword)
+	if hashErr != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Failed to secure password")
+		return
+	}
 
 	updateQuery := `UPDATE [Tender].[dbo].[Users] SET PasswordHash = @p1 WHERE Id = @p2`
 	if config.Env == "prod" {
@@ -71,10 +81,9 @@ func (c *UserPasswordRenew) Post() {
 		return
 	}
 
-	beego.Info("✅ Password reset to '1234' for user:", req.UserId)
-
 	c.Data["json"] = map[string]string{
-		"message": "Password reset to default (1234) successfully",
+		"message":            "Password reset successfully",
+		"temporary_password": newPassword,
 	}
 	c.ServeJSON()
 }

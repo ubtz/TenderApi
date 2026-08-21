@@ -21,6 +21,7 @@ type Basket struct {
 	PublishDate    string `json:"publish_date"`
 	PlanName       string `json:"plan_name"`
 	PlanRootNumber int    `json:"plan_root_number"`
+	IsTemp         bool   `json:"is_temp"`
 	// Category       string `json:"category"` // Ангилал
 	SetDate string `json:"set_date"` // SetDate field if needed
 }
@@ -44,7 +45,8 @@ func (c *GetBasket) GetBasket() {
             PublishDate,
             PlanName,
             PlanRootNumber,
-			SetDate
+			SetDate,
+			ISNULL(IsTemp, 0)
         FROM [Tender].[dbo].[Basket]`
 	if config.Env == "prod" {
 		query = `
@@ -58,7 +60,8 @@ func (c *GetBasket) GetBasket() {
             PublishDate,
             PlanName,
             PlanRootNumber,
-			SetDate
+			SetDate,
+			ISNULL(IsTemp, 0)
         FROM [Tender].[logtender].[Basket]`
 	}
 	rows, err := db.Query(query)
@@ -85,6 +88,7 @@ func (c *GetBasket) GetBasket() {
 			&b.PlanName,
 			&b.PlanRootNumber,
 			&b.SetDate, // Assuming SetDate is a field in the Basket table
+			&b.IsTemp,
 		)
 		if err != nil {
 			fmt.Println("❌ Row scan error:", err)

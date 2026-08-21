@@ -41,6 +41,10 @@ func init() {
 		beego.NSRouter("/GetTest", &controllers.GetTestController{}, "get:Get"),
 		// New route for GetTotalInfo
 		beego.NSRouter("/GetTotalInfo", &controllers.GetTotalInfo{}, "get:GetTotalInfo"),
+		beego.NSRouter("/GetBranchStatistics", &controllers.GetBranchStatistics{}, "get:GetBranchStatistics"),
+		beego.NSRouter("/GetOrders", &controllers.GetOrders{}, "get:GetOrders"),
+		beego.NSRouter("/CposCodeMeasurements", &controllers.GetCposCodeMeasurements{}, "get:Get"),
+		beego.NSRouter("/CposCodeMeasurementDetails", &controllers.GetCposCodeMeasurements{}, "get:GetDetails"),
 	)
 
 	beego.AddNamespace(nss)
@@ -49,6 +53,8 @@ func init() {
 		beego.NSRouter("/upload", &controllers.UploadFiles{}, "POST:Post"),
 		beego.NSRouter("/register", &controllers.Register{}, "POST:PostRegister"),
 		beego.NSRouter("/login", &controllers.UserLogin{}, "POST:PostLogin"),
+		beego.NSRouter("/logout", &controllers.UserLogout{}, "POST:Post"),
+		beego.NSRouter("/heartbeat", &controllers.UserHeartbeat{}, "POST:Post"),
 		beego.NSRouter("/addBasket", &controllers.PostBasket{}, "post:PostBasket"),
 		beego.NSRouter("/PostBasketItems", &controllers.PostBasketItems{}, "post:PostBasketItems"),
 		beego.NSRouter("/PostTender", &controllers.PostTender{}, "post:PostTender"),
@@ -71,6 +77,11 @@ func init() {
 		beego.NSRouter("/UpdateGeree/:id", &controllers.UpdateGeree{}, "put:Put"),
 		beego.NSRouter("/UserInfoUpdate", &controllers.UserInfoUpdate{}, "put:Put"),
 		beego.NSRouter("/UpdateBasket", &controllers.UpdateBasket{}, "put:UpdateBasket"),
+		beego.NSRouter("/MoveBasketItems", &controllers.MoveBasketItems{}, "put:Put"),
+		beego.NSRouter("/UnpackBasketItems", &controllers.UnpackBasketItems{}, "put:Put"),
+		beego.NSRouter("/ReturnBasketItems", &controllers.ReturnBasketItems{}, "put:Put"),
+		beego.NSRouter("/CposCodeMeasurement", &controllers.PutCposCodeMeasurement{}, "put:Put"),
+		beego.NSRouter("/CposCodeMeasurements", &controllers.PutCposCodeMeasurements{}, "put:Put"),
 	)
 
 	// beego.NSRouter("/HB2", &controllers.UpdateХБ_02{}, "PUT:UpdateХБ_02"),
@@ -91,9 +102,20 @@ func init() {
 		beego.NSRouter("/file", &controllers.DeleteFiles{}, "delete:Delete"),
 		beego.NSRouter("/basket-item", &controllers.DeleteBasketItem{}, "delete:DeleteBasketItem"),
 		beego.NSRouter("/deleteBasket", &controllers.DeleteBasket{}, "delete:DeleteBasket"),
+		beego.NSRouter("/Tender/:id", &controllers.DeleteTender{}, "delete:Delete"),
 	) // Add a valid prefix like "/api"
 
 	beego.AddNamespace(nsssss)
 
-	// beego.InsertFilter("/get/*", beego.BeforeRouter, middlewares.JWTAuth) // Apply JWT Middleware
+	external := beego.NewNamespace("/external/orders",
+		beego.NSRouter("/list", &controllers.ExternalOrders{}, "post:List"),
+		beego.NSRouter("/status", &controllers.ExternalOrders{}, "post:Status"),
+		beego.NSRouter("/back", &controllers.ExternalOrders{}, "post:Back"),
+		beego.NSRouter("/client", &controllers.ExternalOrders{}, "post:Client"),
+		beego.NSRouter("/materc2", &controllers.ExternalOrders{}, "post:Materc2"),
+	)
+	beego.AddNamespace(external)
+	beego.Router("/external/employee", &controllers.ExternalEmployee{}, "post:Post")
+	beego.Router("/external/cpos/code", &controllers.ExternalCpos{}, "post:Post")
+
 }
