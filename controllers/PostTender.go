@@ -70,6 +70,11 @@ func (c *PostTender) PostTender() {
 		c.ServeJSON()
 		return
 	}
+	claims, claimsErr := ClaimsForController(&c.Controller)
+	if claimsErr != nil || claims.UserID != input.CreatedBy {
+		c.CustomAbort(http.StatusForbidden, "CreatedBy does not match authenticated session")
+		return
+	}
 
 	// DB connect
 	cfg := getConfig(config.Env)
@@ -158,6 +163,16 @@ func (c *PostTender) PostTender() {
 	}
 
 	log.Printf("✅ Tender inserted successfully: %s", input.TenderName)
+	createNotificationSafe(
+		db,
+		claims.UserID,
+		"tender_created",
+		"Тендер үүсгэгдлээ",
+		input.TenderName,
+		"Tender",
+		0,
+		"/Tender",
+	)
 	c.Data["json"] = map[string]string{"message": "Tender created successfully"}
 	c.ServeJSON()
 }

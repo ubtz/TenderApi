@@ -95,6 +95,22 @@ func (c *PostGeree) PostGeree() {
 	db := connectDB(cfg)
 	defer db.Close()
 
+	var activeTenderCount int
+	if err := db.QueryRow(`
+		SELECT COUNT(1)
+		FROM `+getSchema()+`.[Tender]
+		WHERE TenderId = @p1
+		  AND CONVERT(NVARCHAR(10), [Түтгэлзүүлсэн_огноо], 23) = '1900-01-01'
+		  AND ISNULL(IsDeleted, 0) = 0
+	`, input.TenderId).Scan(&activeTenderCount); err != nil {
+		c.CustomAbort(http.StatusInternalServerError, "Тендерийн төлөв шалгаж чадсангүй")
+		return
+	}
+	if activeTenderCount == 0 {
+		c.CustomAbort(http.StatusConflict, "Түдгэлзүүлсэн тендерт гэрээ үүсгэх боломжгүй")
+		return
+	}
+
 	// ✅ Build dynamic field map
 	fields := map[string]interface{}{
 		"TenderId":               input.TenderId,
@@ -180,6 +196,16 @@ func (c *PostGeree) PostGeree() {
 	}
 
 	log.Printf("✅ Geree inserted successfully for TenderId: %d", input.TenderId)
+	createNotificationSafe(
+		db,
+		input.GereeUserId,
+		"contract_assigned",
+		"Шинэ гэрээ хуваарилагдлаа",
+		fmt.Sprintf("Тендер №%d-ийн гэрээ танд хуваарилагдлаа", input.TenderId),
+		"Tender",
+		int64(input.TenderId),
+		"/Гэрээ_Бүртгэх",
+	)
 	c.Data["json"] = map[string]string{"message": "Гэрээ үүсгэгдлээ"}
 	c.ServeJSON()
 }

@@ -24,6 +24,7 @@ type BasketItemDTO struct {
 	Zno          string          `json:"zno"`
 	Cr4name      string          `json:"cr4name"`
 	Crmarkname   string          `json:"crmarkname"`
+	Crbrandname  string          `json:"crbrandname"`
 	Usize        string          `json:"usize"`
 	Mname        string          `json:"mname"`
 	State        uint8           `json:"state"`
@@ -94,6 +95,7 @@ func (c *GetAll) GetAll() {
 			bi.zno,
 			bi.cr4name,
 			bi.crmarkname,
+			bi.crbrandname,
 			bi.Tech_Tod,
 			bi.Tusuv,
 			bi.State,
@@ -141,6 +143,7 @@ func (c *GetAll) GetAll() {
 			bi.zno,
 			bi.cr4name,
 			bi.crmarkname,
+			bi.crbrandname,
 			bi.Tech_Tod,
 			bi.Tusuv,
 			bi.State,
@@ -178,13 +181,13 @@ func (c *GetAll) GetAll() {
 
 	for rows.Next() {
 		var (
-			rootNum, basketName, basketNumber, basketType, planName, barcode, code, dname, zno, c4name, crmarkname, mname, usize string
-			tech_Tod, tusuv, pkgno, pkgname, techdate, techurl, plandate, planurl, pkgdate, deathdate, key                       sql.NullString
-			addedAt, publishDate, setDate                                                                                        sql.NullTime
-			basketId, userId, basketItemId                                                                                       int
-			price, qty, pricesum                                                                                                 float64
-			state                                                                                                                uint8
-			isValid                                                                                                              bool
+			rootNum, basketName, basketNumber, basketType, planName, barcode, code, dname, zno, c4name, crmarkname, crbrandname, mname, usize string
+			tech_Tod, tusuv, pkgno, pkgname, techdate, techurl, plandate, planurl, pkgdate, deathdate, key                                    sql.NullString
+			addedAt, publishDate, setDate                                                                                                     sql.NullTime
+			basketId, userId, basketItemId                                                                                                    int
+			price, qty, pricesum                                                                                                              float64
+			state                                                                                                                             uint8
+			isValid                                                                                                                           bool
 		)
 
 		err := rows.Scan(
@@ -211,6 +214,7 @@ func (c *GetAll) GetAll() {
 			&zno,
 			&c4name,
 			&crmarkname,
+			&crbrandname,
 			&tech_Tod,
 			&tusuv,
 			&state,
@@ -274,6 +278,7 @@ func (c *GetAll) GetAll() {
 			Zno:          zno,
 			Cr4name:      c4name,
 			Crmarkname:   crmarkname,
+			Crbrandname:  crbrandname,
 			State:        state,
 			Tech_Tod:     &tech_Tod,
 			Tusuv:        &tusuv,

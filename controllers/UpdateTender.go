@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	config "TenderApi/conf"
 
@@ -50,6 +51,19 @@ func (c *UpdateTender) Put() {
 	db := connectDB(cfg)
 	defer db.Close()
 
+	wasSuspended := 0
+	tenderName := ""
+	isSuspensionField := strings.EqualFold(strings.TrimSpace(input.Field), "түтгэлзүүлсэн_огноо")
+	if isSuspensionField {
+		_ = db.QueryRow(`
+			SELECT
+				CASE WHEN CONVERT(NVARCHAR(10), [Түтгэлзүүлсэн_огноо], 23) = '1900-01-01' THEN 0 ELSE 1 END,
+				ISNULL(TenderName, N'Тендер')
+			FROM `+getSchema()+`.[Tender]
+			WHERE TenderId = @p1
+		`, tenderID).Scan(&wasSuspended, &tenderName)
+	}
+
 	// SQL injection хамгаалалттай query
 	query := fmt.Sprintf(`UPDATE [Tender].[dbo].[Tender] SET [%s] = @p1 WHERE TenderId = @p2`, input.Field)
 	if config.Env == "prod" {
@@ -62,6 +76,36 @@ func (c *UpdateTender) Put() {
 		c.Data["json"] = map[string]string{"error": "Failed to update tender"}
 		c.ServeJSON()
 		return
+	}
+
+	valueText := strings.TrimSpace(fmt.Sprint(input.Value))
+	isNowSuspended := isSuspensionField && valueText != "" && !strings.HasPrefix(valueText, "1900-01-01")
+	if isNowSuspended && wasSuspended == 0 {
+		rows, notificationErr := db.Query(`
+			SELECT DISTINCT GereeUserId
+			FROM `+getSchema()+`.[Geree]
+			WHERE TenderId = @p1 AND ISNULL(GereeUserId, 0) > 0
+		`, tenderID)
+		if notificationErr != nil {
+			log.Printf("Failed to find contract specialists for suspended tender %s: %v", tenderID, notificationErr)
+		} else {
+			defer rows.Close()
+			for rows.Next() {
+				var userID int
+				if scanErr := rows.Scan(&userID); scanErr == nil {
+					createNotificationSafe(
+						db,
+						userID,
+						"tender_suspended",
+						"Тендер түдгэлзүүлэгдлээ",
+						tenderName,
+						"Tender",
+						0,
+						"/",
+					)
+				}
+			}
+		}
 	}
 
 	c.Data["json"] = map[string]string{"message": "Tender updated successfully"}

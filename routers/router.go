@@ -37,6 +37,8 @@ func init() {
 		beego.NSRouter("/Statistic", &controllers.GetStatistic{}, "get:GetStatistic"),
 		beego.NSRouter("/GetTenderChainById/:tenderId", &controllers.GetTenderChainById{}, "get:GetTenderChainById"),
 		beego.NSRouter("/GetItemSteps/:itemId", &controllers.GetItemSteps{}, "get:GetItemSteps"),
+		beego.NSRouter("/Notifications", &controllers.Notifications{}, "get:GetAll"),
+		beego.NSRouter("/NotificationCount", &controllers.Notifications{}, "get:GetCount"),
 		beego.NSRouter("/GetBasketIdsByRootNum/:rootNum", &controllers.GetBasketIdsByRootNum{}, "get:Get"),
 		beego.NSRouter("/GetTest", &controllers.GetTestController{}, "get:Get"),
 		// New route for GetTotalInfo
@@ -58,6 +60,8 @@ func init() {
 		beego.NSRouter("/addBasket", &controllers.PostBasket{}, "post:PostBasket"),
 		beego.NSRouter("/PostBasketItems", &controllers.PostBasketItems{}, "post:PostBasketItems"),
 		beego.NSRouter("/PostTender", &controllers.PostTender{}, "post:PostTender"),
+		beego.NSRouter("/ReannounceTender", &controllers.ReannounceTender{}, "post:Post"),
+		beego.NSRouter("/ReannounceTender/:id", &controllers.ReannounceTender{}, "post:Post"),
 		beego.NSRouter("/PostExecTeam", &controllers.PostExecTeam{}, "post:PostExecTeam"),
 		beego.NSRouter("/PostGeree", &controllers.PostGeree{}, "post:PostGeree"),
 		beego.NSRouter("/PostUnelgeeHoroo", &controllers.PostUnelgeeHoroo{}, "post:PostUnelgeeHoroo"),
@@ -82,6 +86,8 @@ func init() {
 		beego.NSRouter("/ReturnBasketItems", &controllers.ReturnBasketItems{}, "put:Put"),
 		beego.NSRouter("/CposCodeMeasurement", &controllers.PutCposCodeMeasurement{}, "put:Put"),
 		beego.NSRouter("/CposCodeMeasurements", &controllers.PutCposCodeMeasurements{}, "put:Put"),
+		beego.NSRouter("/NotificationRead/:id", &controllers.Notifications{}, "put:MarkRead"),
+		beego.NSRouter("/NotificationsReadAll", &controllers.Notifications{}, "put:MarkAllRead"),
 	)
 
 	// beego.NSRouter("/HB2", &controllers.UpdateХБ_02{}, "PUT:UpdateХБ_02"),

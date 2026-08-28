@@ -48,6 +48,8 @@ type BasketItemData struct {
 	RId          string         `json:"rid"`
 	USize        string         `json:"usize"`
 	ZNo          string         `json:"zno"`
+	PkgNo        string         `json:"pkgno"`
+	PkgDate      string         `json:"pkgdate"`
 	PkgName      string         `json:"pkgname"`
 	IsArrived    sql.NullBool   `json:"isArrived"`
 	Tailbar      sql.NullString `json:"tailbar"`
@@ -88,6 +90,8 @@ type BasketItemResponse struct {
 	RId          string  `json:"rid"`
 	USize        string  `json:"usize"`
 	ZNo          string  `json:"zno"`
+	PkgNo        string  `json:"pkgno"`
+	PkgDate      string  `json:"pkgdate"`
 	PkgName      string  `json:"pkgname"`
 	IsArrived    *bool   `json:"isArrived,omitempty"`
 	Tailbar      *string `json:"tailbar,omitempty"`
@@ -167,6 +171,8 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
             bi.rid,
             bi.usize,
             bi.zno,
+			ISNULL(bi.pkgno, ''),
+			ISNULL(CONVERT(VARCHAR(30), bi.pkgdate, 126), ''),
             ISNULL(bi.pkgname, ''),
             bi.isArrived,
             bi.tailbar
@@ -225,6 +231,8 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			&bi.RId,
 			&bi.USize,
 			&bi.ZNo,
+			&bi.PkgNo,
+			&bi.PkgDate,
 			&bi.PkgName,
 			&bi.IsArrived,
 			&bi.Tailbar,
@@ -269,6 +277,8 @@ func (c *GetBasketItemsById) GetBasketItemsById() {
 			RId:          bi.RId,
 			USize:        bi.USize,
 			ZNo:          bi.ZNo,
+			PkgNo:        bi.PkgNo,
+			PkgDate:      bi.PkgDate,
 			PkgName:      bi.PkgName,
 		}
 

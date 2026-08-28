@@ -91,6 +91,9 @@ func (c *GetBasketItems) GetBasketItems() {
 		-- CURRENT STEP KEY (SAME LOGIC AS GetItemSteps)
 		-- =========================
 		CASE
+			-- ✅ Delivery is the final stage
+			WHEN ISNULL(bi.isArrived, 0) = 1 THEN 'delivered'
+
 			-- 🏁 Contract (Geree) wins
 			WHEN EXISTS (
 				SELECT 1
@@ -115,7 +118,8 @@ func (c *GetBasketItems) GetBasketItems() {
 			WHEN EXISTS (
 				SELECT 1
 				FROM [Tender].[dbo].[Tender] t
-				WHERE EXISTS (
+				WHERE ISNULL(t.IsDeleted, 0) = 0
+				  AND EXISTS (
 					SELECT 1
 					FROM (
 						SELECT LTRIM(RTRIM(x.i.value('.', 'VARCHAR(20)'))) AS basket_id
@@ -170,6 +174,8 @@ func (c *GetBasketItems) GetBasketItems() {
 			bi.Tailbar,
 
 			CASE
+				WHEN ISNULL(bi.isArrived, 0) = 1 THEN 'delivered'
+
 				WHEN EXISTS (
 					SELECT 1
 					FROM [Tender].[logtender].[Geree] g
@@ -192,7 +198,8 @@ func (c *GetBasketItems) GetBasketItems() {
 				WHEN EXISTS (
 					SELECT 1
 					FROM [Tender].[logtender].[Tender] t
-					WHERE EXISTS (
+					WHERE ISNULL(t.IsDeleted, 0) = 0
+					  AND EXISTS (
 						SELECT 1
 						FROM (
 							SELECT LTRIM(RTRIM(x.i.value('.', 'VARCHAR(20)'))) AS basket_id

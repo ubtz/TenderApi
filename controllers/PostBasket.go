@@ -3,6 +3,7 @@ package controllers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -28,6 +29,21 @@ type BasketInput struct {
 	PublishDate    string      `json:"publishDate"`
 	SetDate        string      `json:"setDate"`
 	IsTemp         bool        `json:"isTemp"`
+}
+
+func parseBasketDate(value string) (time.Time, error) {
+	value = strings.TrimSpace(value)
+	for _, layout := range []string{
+		"2006-01-02",
+		time.RFC3339,
+		"2006-01-02T15:04:05",
+		"2006/01/02",
+	} {
+		if parsed, err := time.Parse(layout, value); err == nil {
+			return parsed, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unsupported basket date %q", value)
 }
 
 func (c *PostBasket) PostBasket() {
@@ -61,15 +77,15 @@ func (c *PostBasket) PostBasket() {
 		input.BasketName,
 	)
 
-	publishDate, err1 := time.Parse("2006-01-02", input.PublishDate)
-	setDate, err2 := time.Parse("2006-01-02", input.SetDate)
+	publishDate, err1 := parseBasketDate(input.PublishDate)
+	setDate, err2 := parseBasketDate(input.SetDate)
 	if err1 != nil || err2 != nil {
 		log.Printf(
 			"❌ [PostBasket] date parse error publish=%s set=%s",
 			input.PublishDate,
 			input.SetDate,
 		)
-		c.CustomAbort(http.StatusBadRequest, "Invalid date format. Use YYYY-MM-DD")
+		c.CustomAbort(http.StatusBadRequest, "Invalid date format. Use YYYY-MM-DD or ISO 8601")
 		return
 	}
 
@@ -83,7 +99,7 @@ func (c *PostBasket) PostBasket() {
 	}
 	defer tx.Rollback()
 
-	lockResource := "TenderBasket:" + strconv.Itoa(input.UserId) + ":" + strconv.Itoa(input.PlanRootNumber) + ":" + input.BasketType
+	lockResource := "TenderBasket:" + strconv.Itoa(input.UserId) + ":" + strconv.Itoa(input.PlanRootNumber)
 	var lockResult int
 	if err := tx.QueryRow(`
 		DECLARE @result int;
@@ -126,6 +142,31 @@ func (c *PostBasket) PostBasket() {
 		if err != sql.ErrNoRows {
 			log.Printf("Temporary basket lookup failed: %v", err)
 			c.CustomAbort(http.StatusInternalServerError, "Failed to check temporary basket")
+			return
+		}
+	}
+
+	if !input.IsTemp {
+		duplicateQuery := `
+			SELECT COUNT(1)
+			FROM [Tender].[dbo].[Basket]
+			WHERE UserId = @p1
+				AND PlanRootNumber = @p2
+				AND ISNULL(IsTemp, 0) = 0
+				AND LOWER(LTRIM(RTRIM(BasketName))) = LOWER(LTRIM(RTRIM(@p3)))
+		`
+		if config.Env == "prod" {
+			duplicateQuery = strings.Replace(duplicateQuery, "[Tender].[dbo]", "[Tender].[logtender]", 1)
+		}
+
+		var duplicateCount int
+		if err := tx.QueryRow(duplicateQuery, input.UserId, input.PlanRootNumber, input.BasketName).Scan(&duplicateCount); err != nil {
+			log.Printf("Basket duplicate-name lookup failed: %v", err)
+			c.CustomAbort(http.StatusInternalServerError, "Failed to validate basket name")
+			return
+		}
+		if duplicateCount > 0 {
+			c.CustomAbort(http.StatusConflict, "Ижил нэртэй багц энэ төлөвлөгөөнд аль хэдийн байна")
 			return
 		}
 	}

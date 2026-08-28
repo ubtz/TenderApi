@@ -159,6 +159,9 @@ func (c *ExternalOrders) proxy(path string, withToken bool) {
 	if path == "/back" {
 		beego.Info("Orders back upstream response: status=", statusCode, "body=", string(responseBody))
 	}
+	if path == "/list" && statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		matchWaitingTenderRecycles(responseBody)
+	}
 	c.Ctx.Output.SetStatus(statusCode)
 	c.Ctx.Output.Header("Content-Type", "application/json; charset=utf-8")
 	c.Ctx.Output.Body(responseBody)
@@ -191,6 +194,9 @@ func (c *ExternalOrders) List() {
 		beego.Error("External yearly orders request failed:", err)
 		c.CustomAbort(http.StatusBadGateway, "External orders service is unavailable")
 		return
+	}
+	if statusCode >= http.StatusOK && statusCode < http.StatusMultipleChoices {
+		matchWaitingTenderRecycles(responseBody)
 	}
 	c.Ctx.Output.SetStatus(statusCode)
 	c.Ctx.Output.Header("Content-Type", "application/json; charset=utf-8")

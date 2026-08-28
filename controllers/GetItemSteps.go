@@ -63,7 +63,8 @@ func (c *GetItemSteps) GetItemSteps() {
 		dedate,
 		cdate,
 		udate,
-		AddedAt
+		AddedAt,
+		isArrived
 	FROM [Tender].[dbo].[BasketItems]
 	WHERE BasketItemId = @itemId AND ISNULL(IsReturned, 0) = 0
 	`
@@ -76,19 +77,21 @@ func (c *GetItemSteps) GetItemSteps() {
 			dedate,
 			cdate,
 			udate,
-			AddedAt
+			AddedAt,
+			isArrived
 		FROM [Tender].[logtender].[BasketItems]
 		WHERE BasketItemId = @itemId AND ISNULL(IsReturned, 0) = 0
 		`
 	}
 
 	var (
-		basketId int
-		ddate    sql.NullString
-		dedate   sql.NullString
-		cdate    sql.NullString
-		udate    sql.NullString
-		addedAt  sql.NullString
+		basketId  int
+		ddate     sql.NullString
+		dedate    sql.NullString
+		cdate     sql.NullString
+		udate     sql.NullString
+		addedAt   sql.NullString
+		isArrived sql.NullBool
 	)
 
 	err = db.QueryRow(itemQuery, sql.Named("itemId", itemId)).Scan(
@@ -98,6 +101,7 @@ func (c *GetItemSteps) GetItemSteps() {
 		&cdate,
 		&udate,
 		&addedAt,
+		&isArrived,
 	)
 	if err != nil {
 		c.CustomAbort(http.StatusInternalServerError, err.Error())
@@ -165,7 +169,8 @@ func (c *GetItemSteps) GetItemSteps() {
     t.TenderId,
     t.Тендер_нээх_огноо
 		FROM [Tender].[dbo].[Tender] t
-		WHERE EXISTS (
+		WHERE ISNULL(t.IsDeleted, 0) = 0
+		  AND EXISTS (
 			SELECT 1
 			FROM (
 				SELECT LTRIM(RTRIM(x.i.value('.', 'VARCHAR(20)'))) AS basket_id
@@ -189,7 +194,8 @@ func (c *GetItemSteps) GetItemSteps() {
     t.TenderId,
     t.Тендер_нээх_огноо
 	FROM [Tender].[logtender].[Tender] t
-	WHERE EXISTS (
+	WHERE ISNULL(t.IsDeleted, 0) = 0
+	  AND EXISTS (
 		SELECT 1
 		FROM (
 			SELECT LTRIM(RTRIM(x.i.value('.', 'VARCHAR(20)'))) AS basket_id
@@ -296,7 +302,15 @@ func (c *GetItemSteps) GetItemSteps() {
 		})
 	}
 
-	// 5.3️⃣ Mark ONLY last step as current
+	// 5.3️⃣ Delivery is the final stage
+	if isArrived.Valid && isArrived.Bool {
+		steps = append(steps, ItemStep{
+			StepKey: "delivered",
+			Title:   "Бараа хүлээн авсан",
+		})
+	}
+
+	// 5.4️⃣ Mark ONLY last step as current
 	if len(steps) > 0 {
 		steps[len(steps)-1].IsCurrent = true
 	}

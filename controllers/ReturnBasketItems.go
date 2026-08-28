@@ -74,6 +74,16 @@ func (c *ReturnBasketItems) Put() {
 		c.CustomAbort(http.StatusConflict, "Some basket items could not be returned")
 		return
 	}
+	createNotificationSafe(
+		db,
+		claims.UserID,
+		"order_returned",
+		"Захиалга буцаагдлаа",
+		fmt.Sprintf("%d захиалга буцаагдсан төлөвт орлоо", updated),
+		"BasketItem",
+		0,
+		"/Багцлах",
+	)
 
 	c.Data["json"] = map[string]interface{}{
 		"message":        "Basket items marked returned",

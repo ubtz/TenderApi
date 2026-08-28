@@ -74,8 +74,9 @@ func (c *GetTender) GetTender() {
 			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids], t.[RootTenderId]
 		FROM [Tender].[dbo].[Tender] AS t
 		LEFT JOIN [Tender].[dbo].[Users] AS u ON t.CreatedBy = u.Id
-		WHERE t.RootTenderId IS NULL
-		  AND ISNULL(t.IsDeleted, 0) = 0
+		WHERE ISNULL(t.IsDeleted, 0) = 0
+		  AND ISNULL(t.IsCurrent, 1) = 1
+		  AND ISNULL(t.LifecycleStatus, N'Active') = N'Active'
 		ORDER BY t.TenderId DESC
 	`
 
@@ -96,8 +97,9 @@ func (c *GetTender) GetTender() {
 			t.[Ү_Дугаар], t.[Ү_Огноо], t.[ЗҮК_Дугаар], t.[ЗҮК_Огноо], t.[Basket_Ids], t.[RootTenderId]
 		FROM [Tender].[logtender].[Tender] AS t
 		LEFT JOIN [Tender].[logtender].[Users] AS u ON t.CreatedBy = u.Id
-		WHERE t.RootTenderId IS NULL
-		  AND ISNULL(t.IsDeleted, 0) = 0
+		WHERE ISNULL(t.IsDeleted, 0) = 0
+		  AND ISNULL(t.IsCurrent, 1) = 1
+		  AND ISNULL(t.LifecycleStatus, N'Active') = N'Active'
 		ORDER BY t.TenderId DESC
 		`
 	}

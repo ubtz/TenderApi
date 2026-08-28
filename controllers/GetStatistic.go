@@ -3,6 +3,9 @@ package controllers
 import (
 	config "TenderApi/conf"
 	"fmt"
+	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/astaxie/beego"
 )
@@ -30,6 +33,18 @@ type StatisticResponse struct {
 }
 
 func (c *GetStatistic) GetStatistic() {
+	year := time.Now().Year()
+	if rawYear := c.GetString("year"); rawYear != "" {
+		parsedYear, err := strconv.Atoi(rawYear)
+		if err != nil || parsedYear < 2000 || parsedYear > 2100 {
+			c.Ctx.Output.SetStatus(http.StatusBadRequest)
+			c.Data["json"] = map[string]string{"error": "Invalid statistic year"}
+			c.ServeJSON()
+			return
+		}
+		year = parsedYear
+	}
+
 	cfg := getConfig(config.Env)
 	db := connectDB(cfg)
 	defer db.Close()
@@ -62,6 +77,10 @@ BasketStats AS (
 		) AS TotalOrderValue
 	FROM ` + baseSchema + `.[BasketItems] bi
 	WHERE ISNULL(bi.IsReturned, 0) = 0
+	  AND CASE
+		WHEN ISDATE(CAST(bi.pkgdate AS NVARCHAR(30))) = 1
+		THEN YEAR(CAST(CAST(bi.pkgdate AS NVARCHAR(30)) AS DATETIME))
+	  END = @p1
 	GROUP BY ISNULL(CAST(bi.dcode AS NVARCHAR(255)), '')
 ),
 TenderExpanded AS (
@@ -91,6 +110,7 @@ TenderExpanded AS (
 		) > 0
 	WHERE t.RootTenderId IS NULL
 	  AND ISNULL(t.IsDeleted, 0) = 0
+	  AND YEAR(CAST(t.CreatedAt AS DATETIME)) = @p1
 ),
 TenderStats AS (
 	SELECT
@@ -103,22 +123,38 @@ TenderStats AS (
 	FROM TenderExpanded te
 	GROUP BY te.dcode
 ),
+GereeExpanded AS (
+	SELECT
+		DISTINCT g.[GereeId],
+		bm.dcode,
+		CASE
+			WHEN ISNUMERIC(REPLACE(CAST(g.[Гэрээний_дүн] AS NVARCHAR(MAX)), ',', '')) = 1
+			THEN CAST(REPLACE(CAST(g.[Гэрээний_дүн] AS NVARCHAR(MAX)), ',', '') AS FLOAT)
+			ELSE 0
+		END AS ContractValue
+	FROM ` + baseSchema + `.[Geree] g
+	INNER JOIN ` + baseSchema + `.[Tender] tender ON tender.TenderId = g.TenderId
+	INNER JOIN BranchMap bm
+		ON CHARINDEX(
+			(',' + bm.shortName + ',') COLLATE DATABASE_DEFAULT,
+			(',' + REPLACE(CAST(tender.[Organization] AS NVARCHAR(MAX)), ', ', ',') + ',') COLLATE DATABASE_DEFAULT
+		) > 0
+	WHERE YEAR(CAST(g.CreatedAt AS DATETIME)) = @p1
+),
 GereeStats AS (
 	SELECT
-		COUNT(g.[GereeId]) AS TotalContracts,
-		SUM(
-			CASE
-				WHEN ISNUMERIC(REPLACE(CAST(g.[Гэрээний_дүн] AS NVARCHAR(MAX)), ',', '')) = 1
-				THEN CAST(REPLACE(CAST(g.[Гэрээний_дүн] AS NVARCHAR(MAX)), ',', '') AS FLOAT)
-				ELSE 0
-			END
-		) AS TotalContractValue
-	FROM ` + baseSchema + `.[Geree] g
+		dcode,
+		COUNT(DISTINCT GereeId) AS TotalContracts,
+		SUM(ContractValue) AS TotalContractValue
+	FROM GereeExpanded
+	GROUP BY dcode
 ),
 AllDcodes AS (
 	SELECT dcode FROM BasketStats
 	UNION
 	SELECT dcode FROM TenderStats
+	UNION
+	SELECT dcode FROM GereeStats
 )
 SELECT
 	a.dcode,
@@ -134,7 +170,7 @@ SELECT
 FROM AllDcodes a
 LEFT JOIN BasketStats b ON a.dcode = b.dcode
 LEFT JOIN TenderStats t ON a.dcode = t.dcode
-CROSS JOIN GereeStats g
+LEFT JOIN GereeStats g ON a.dcode = g.dcode
 ORDER BY a.dcode;
 `
 
@@ -165,6 +201,10 @@ FROM (
 		) AS TotalOrderValue
 	FROM ` + baseSchema + `.[BasketItems]
 	WHERE ISNULL(IsReturned, 0) = 0
+	  AND CASE
+		WHEN ISDATE(CAST(pkgdate AS NVARCHAR(30))) = 1
+		THEN YEAR(CAST(CAST(pkgdate AS NVARCHAR(30)) AS DATETIME))
+	  END = @p1
 ) o
 CROSS JOIN (
 	SELECT
@@ -201,6 +241,7 @@ CROSS JOIN (
 	FROM ` + baseSchema + `.[Tender]
 	WHERE RootTenderId IS NULL
 	  AND ISNULL(IsDeleted, 0) = 0
+	  AND YEAR(CAST(CreatedAt AS DATETIME)) = @p1
 ) t
 CROSS JOIN (
 	SELECT
@@ -213,10 +254,11 @@ CROSS JOIN (
 			END
 		) AS TotalContractValue
 	FROM ` + baseSchema + `.[Geree]
+	WHERE YEAR(CAST(CreatedAt AS DATETIME)) = @p1
 ) g;
 `
 
-	rows, err := db.Query(rowsQuery)
+	rows, err := db.Query(rowsQuery, year)
 	if err != nil {
 		fmt.Println("❌ Statistic rows query error:", err)
 		c.Ctx.Output.SetStatus(500)
@@ -260,7 +302,7 @@ CROSS JOIN (
 	}
 
 	var summary Statistic
-	err = db.QueryRow(summaryQuery).Scan(
+	err = db.QueryRow(summaryQuery, year).Scan(
 		&summary.Dcode,
 		&summary.TotalOrders,
 		&summary.TotalOrderValue,

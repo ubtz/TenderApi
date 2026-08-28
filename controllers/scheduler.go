@@ -19,6 +19,9 @@ func runJobOnce() {
 		" failed_orders:",
 		summary.FailedOrders,
 	)
+	if err := generateDueDateNotifications(); err != nil {
+		beego.Error("Due-date notification job failed:", err)
+	}
 }
 
 func StartDailyJob() {
